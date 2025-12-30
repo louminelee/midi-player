@@ -1,0 +1,280 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>MIDI Player: Modular Architecture</title>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@latest/dist/tf.min.js"></script>
+    <style>
+        :root {
+            --glass-bg: rgba(255, 255, 255, 0.65);
+            --glass-border: rgba(255, 255, 255, 0.4);
+            --glass-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.1);
+            --accent-color: #007aff;
+            --accent-danger: #ff3b30;
+            --text-main: #1d1d1f;
+            --text-sub: #86868b;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Helvetica Neue", "Segoe UI", Roboto, sans-serif;
+            margin: 0;
+            padding: 20px;
+            color: var(--text-main);
+            overflow-x: hidden;
+            background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+            min-height: 100vh;
+        }
+
+        #bgCanvas {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: -1;
+        }
+
+        .dashboard {
+            display: flex; gap: 20px; margin-bottom: 20px; flex-wrap: wrap; position: relative; z-index: 10;
+        }
+
+        .panel {
+            background: var(--glass-bg); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
+            border-radius: 20px; border: 1px solid var(--glass-border); box-shadow: var(--glass-shadow);
+            padding: 24px; transition: transform 0.2s ease;
+        }
+
+        .controls-left { flex: 1; min-width: 300px; }
+        .adsr-panel { flex: 1; min-width: 340px; }
+
+        h1 { margin-top: 0; font-weight: 200; font-size: 28px; letter-spacing: -0.5px; }
+        h2 { margin-top: 0; font-size: 14px; color: var(--text-sub); text-transform: uppercase; letter-spacing: 1px; border-bottom: 1px solid rgba(0,0,0,0.05); padding-bottom: 10px; margin-bottom: 20px; font-weight: 600; }
+
+        .control-group { margin-bottom: 20px; display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+
+        input[type="file"]::file-selector-button, button {
+            background: transparent; color: var(--accent-color); border: 1px solid var(--accent-color);
+            padding: 8px 16px; border-radius: 12px; font-size: 14px; cursor: pointer; transition: all 0.2s; font-weight: 500;
+        }
+        button:hover, input[type="file"]::file-selector-button:hover { background: var(--accent-color); color: white; }
+        button:disabled { border-color: #ccc; color: #ccc; background: transparent; cursor: not-allowed; }
+        #stopBtn { color: var(--accent-danger); border-color: var(--accent-danger); }
+        #stopBtn:hover { background: var(--accent-danger); color: white; }
+
+        #status { font-size: 13px; color: var(--text-sub); padding-top: 10px; }
+
+        /* ADSR Controls */
+        .adsr-visualizer { width: 100%; height: 120px; border-radius: 12px; margin-bottom: 20px; background: rgba(255,255,255,0.4); }
+        .knob-container { display: flex; justify-content: space-around; text-align: center; }
+        
+        .knob-wrapper { 
+            width: 60px; 
+            display: flex; 
+            flex-direction: column; 
+            align-items: center;
+            cursor: ew-resize;
+            user-select: none;
+            touch-action: none;
+        }
+        
+        .knob { width: 44px; height: 44px; border-radius: 50%; border: 1px solid rgba(0,0,0,0.1); background: white; margin-bottom: 8px; position: relative; box-shadow: 0 4px 10px rgba(0,0,0,0.05); }
+        .knob::after { content: ''; position: absolute; top: 5px; left: 50%; transform: translateX(-50%); width: 2px; height: 10px; background-color: var(--accent-color); border-radius: 2px; }
+        
+        .knob-input { position: absolute; top: 0; left: 8px; width: 44px; height: 44px; opacity: 0; cursor: ns-resize; transform: rotate(-90deg); pointer-events: none; }
+        
+        .knob-label { font-size: 10px; font-weight: 600; color: var(--text-sub); margin-bottom: 2px; pointer-events: none; }
+        
+        .val-input { 
+            width: 36px; background: transparent; border: none; border-bottom: 1px solid rgba(0,0,0,0.1); 
+            text-align: center; font-size: 12px; color: var(--text-main); font-family: monospace;
+            pointer-events: auto; 
+        }
+        .val-input:focus { border-bottom-color: var(--accent-color); outline: none; }
+        
+        #scoreDisplay {
+            position: relative; z-index: 10; background: var(--glass-bg); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
+            border: 1px solid var(--glass-border); border-radius: 20px; box-shadow: var(--glass-shadow); padding: 30px;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            line-height: 1.5; font-size: 20px;
+            white-space: normal; overflow-x: auto; min-height: 200px;
+        }
+
+        .score-notes { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 8px; row-gap: 25px; }
+        .score-info { color: var(--text-sub); font-size: 14px; margin-bottom: 20px; border-bottom: 1px solid rgba(0,0,0,0.05); padding-bottom: 10px; }
+
+        /* Score elements styles remain the same */
+        .note-unit { display: inline-flex; flex-direction: row; align-items: flex-end; margin: 0 2px; position: relative; cursor: default; min-width: 1.5em; }
+        .note-column { display: flex; flex-direction: column; align-items: center; }
+        .note-content { position: relative; font-weight: 600; font-size: 22px; line-height: 1; padding: 3px 0; z-index: 2; }
+        
+        .current-note .note-content { color: var(--accent-color); transform: scale(1.15); transition: all 0.1s; }
+        
+        .dots-container { display: flex; flex-direction: column; gap: 2px; align-items: center; line-height: 0; }
+        .dot-mark { width: 4px; height: 4px; background-color: #333; border-radius: 50%; display: block; }
+        .current-note .dot-mark { background-color: var(--accent-color); }
+        .dots-top { margin-bottom: 2px; }
+        .dots-bottom { margin-top: 2px; }
+
+        .duration-lines { display: flex; flex-direction: column; width: 100%; gap: 3px; margin-top: 2px; align-items: center; }
+        .d-line { width: 100%; height: 2px; background-color: #333; border-radius: 1px; }
+        .current-note .d-line { background-color: var(--accent-color); }
+
+        .rhythm-dot { position: absolute; right: -7px; bottom: 2px; font-size: 18px; line-height: 0; color: #333; }
+        .current-note .rhythm-dot { color: var(--accent-color); }
+
+        .extension-dash { display: inline-block; font-weight: 400; margin-left: 6px; font-size: 20px; color: #555; align-self: center; margin-bottom: 6px; }
+        .current-note .extension-dash { color: var(--accent-color); }
+
+        .bar-line { display: inline-block; margin: 0 12px; color: var(--accent-danger); font-size: 24px; font-weight: 300; align-self: center; opacity: 0.5; margin-bottom: 5px; }
+        .chord-group { display: inline-flex; flex-direction: column; border: 1px dashed rgba(0,0,0,0.1); border-radius: 4px; padding: 2px; align-items: center; }
+
+        select {
+            appearance: none; background: rgba(255,255,255,0.5); border: 1px solid rgba(0,0,0,0.1); padding: 6px 24px 6px 12px;
+            border-radius: 8px; font-size: 14px; color: var(--text-main);
+            background-image: url("data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22292.4%22%20height%3D%22292.4%22%3E%3Cpath%20fill%3D%22%23333%22%20d%3D%22M287%2069.4a17.6%2017.6%200%200%200-13-5.4H18.4c-5%200-9.3%201.8-12.9%205.4A17.6%2017.6%200%200%200%200%2082.2c0%205%201.8%209.3%205.4%2012.9l128%20127.9c3.6%203.6%207.8%205.4%2012.8%205.4s9.2-1.8%2012.8-5.4L287%2095c3.5-3.5%205.4-7.8%205.4-12.8%200-5-1.9-9.2-5.5-12.8z%22%2F%3E%3C%2Fsvg%3E");
+            background-repeat: no-repeat; background-position: right 8px center; background-size: 10px;
+        }
+
+        #handwriteModal {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.5); z-index: 100;
+            display: none; align-items: center; justify-content: center;
+            backdrop-filter: blur(5px);
+        }
+        .modal-content {
+            background: rgba(255, 255, 255, 0.95);
+            padding: 30px; border-radius: 24px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.2);
+            max-width: 900px; width: 90%;
+            display: flex; flex-direction: column; gap: 20px;
+        }
+        .grid-container {
+            display: grid; grid-template-columns: repeat(8, 1fr); gap: 10px;
+            background: #eee; padding: 10px; border-radius: 12px;
+            max-height: 60vh; overflow-y: auto;
+        }
+        .grid-cell { background: white; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); position: relative; cursor: crosshair; }
+        .grid-cell canvas { width: 100%; height: 100%; display: block; border-radius: 8px; }
+        .grid-cell::after { content: ''; position: absolute; bottom: 5px; right: 5px; font-size: 10px; color: #ccc; }
+        .modal-header { display: flex; justify-content: space-between; align-items: center; }
+        .modal-footer { display: flex; justify-content: flex-end; gap: 10px; margin-top: 10px; }
+        #loadingOverlay {
+            position: absolute; top:0; left:0; width:100%; height:100%;
+            background: rgba(255,255,255,0.8); display: none; align-items: center; justify-content: center;
+            font-weight: bold; color: var(--accent-color); border-radius: 24px;
+        }
+    </style>
+</head>
+<body>
+    <canvas id="bgCanvas"></canvas>
+
+    <div class="dashboard">
+        <div class="panel controls-left">
+            <h1>MIDI Player</h1>
+            
+            <div class="control-group">
+                <input type="file" id="midiFile" accept=".mid,.midi">
+                <button id="playBtn">Play</button>
+                <button id="stopBtn" disabled>Stop</button>
+                <button id="handwriteBtn"> Write Score</button>
+            </div>
+            
+            <div class="control-group">
+                <label for="transpose" style="color:var(--text-sub); font-size:14px;">Transpose</label>
+                <input type="number" id="transpose" value="0" min="-24" max="24" step="1" class="val-input" style="width:40px; font-size:14px;">
+                
+                <label style="color:var(--text-sub); font-size:14px; margin-left:15px;">Key</label>
+                <select id="keySignature">
+                    <option value="C">C / Am</option>
+                    <option value="G">G / Em (1#)</option>
+                    <option value="D">D / Bm (2#)</option>
+                    <option value="A">A / F#m (3#)</option>
+                    <option value="E">E / C#m (4#)</option>
+                    <option value="B">B / G#m (5#)</option>
+                    <option value="F#">F# / D#m (6#)</option>
+                    <option value="F">F / Dm (1b)</option>
+                    <option value="Bb">Bb / Gm (2b)</option>
+                    <option value="Eb">Eb / Cm (3b)</option>
+                    <option value="Ab">Ab / Fm (4b)</option>
+                    <option value="Db">Db / Bbm (5b)</option>
+                </select>
+            </div>
+            
+            <div class="control-group">
+                <label style="font-size:14px; min-width:60px;">Volume</label>
+                <input type="range" id="volume" min="0" max="100" value="50" style="flex:1;">
+                <span id="volumeValue" style="width:30px; text-align:right; font-size:12px;">50</span>
+            </div>
+            
+            <div class="control-group">
+                <label style="font-size:14px; min-width:60px;">Tempo</label>
+                <input type="range" id="tempo" min="50" max="200" value="100" style="flex:1;">
+                <span id="tempoValue" style="width:30px; text-align:right; font-size:12px;">100</span>
+            </div>
+            
+            <div id="status">Select a MIDI file or write your own</div>
+        </div>
+
+        <div class="panel adsr-panel">
+            <h2>Envelope Control</h2>
+            <canvas id="adsrCanvas" class="adsr-visualizer" width="340" height="120"></canvas>
+            
+            <div class="knob-container">
+                <div class="knob-wrapper">
+                    <div id="knob-a" class="knob"></div>
+                    <input type="range" id="adsr-attack-knob" class="knob-input" min="0" max="100" step="0.1" value="0">
+                    <div class="knob-label">ATTACK</div>
+                    <div><input type="number" id="val-a" class="val-input" value="50"> <span class="unit-label">ms</span></div>
+                </div>
+                <div class="knob-wrapper">
+                    <div id="knob-d" class="knob"></div>
+                    <input type="range" id="adsr-decay-knob" class="knob-input" min="0" max="100" step="0.1" value="0">
+                    <div class="knob-label">DECAY</div>
+                    <div><input type="number" id="val-d" class="val-input" value="200"> <span class="unit-label">ms</span></div>
+                </div>
+                <div class="knob-wrapper">
+                    <div id="knob-s" class="knob"></div>
+                    <input type="range" id="adsr-sustain-knob" class="knob-input" min="0" max="100" step="1" value="60">
+                    <div class="knob-label">SUSTAIN</div>
+                    <div><input type="number" id="val-s" class="val-input" value="60"> <span class="unit-label">%</span></div>
+                </div>
+                <div class="knob-wrapper">
+                    <div id="knob-r" class="knob"></div>
+                    <input type="range" id="adsr-release-knob" class="knob-input" min="0" max="100" step="0.1" value="0">
+                    <div class="knob-label">RELEASE</div>
+                    <div><input type="number" id="val-r" class="val-input" value="300"> <span class="unit-label">ms</span></div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div id="scoreDisplay">
+        <div class="score-container" id="scoreContainer">
+            <div style="color:#999; text-align:center; padding-top:40px;">No score loaded</div>
+        </div>
+    </div>
+
+    <div id="handwriteModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Handwrite Score (Draw 1-7)</h2>
+                <div style="display:flex; gap:10px; align-items:center;">
+                    <label>Key:</label>
+                    <select id="modalKeySig">
+                        <option value="C">C</option>
+                        <option value="G">G</option>
+                        <option value="D">D</option>
+                        <option value="F">F</option>
+                        <option value="Bb">Bb</option>
+                    </select>
+                </div>
+            </div>
+            <div class="grid-container" id="drawingGrid"></div>
+            <div class="modal-footer">
+                <button id="clearGridBtn" style="border-color:#999; color:#666;">Clear All</button>
+                <button id="cancelGridBtn" style="border-color:#999; color:#666;">Cancel</button>
+                <button id="recognizeBtn" style="background:var(--accent-color); color:white;">Confirm & Play</button>
+            </div>
+            <div id="loadingOverlay">Loading AI Model / Recognizing...</div>
+        </div>
+    </div>
+    
+    <script src="https://cdn.jsdelivr.net/npm/midi-parser-js@4.0.4/src/main.min.js"></script>    
+    <script type="module" src="js/main.js"></script>
+</body>
+</html>
