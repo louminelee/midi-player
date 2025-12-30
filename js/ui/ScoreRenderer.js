@@ -6,18 +6,56 @@ export default class ScoreRenderer {
     }
 
     injectStyles() {
-        // ????? CSS ????
+        // [FIX] 针对液体玻璃风格(大字体)调整定位参数
+        // 增加行间距 row-gap: 65px (原45px)，防止八度点重叠
+        // 调整 dots-top bottom: 32px (原22px)，避开大号数字
+        // 调整 bottom-wrapper top: 34px (原26px)
         if(!document.getElementById('score-fix-style')) {
             const style = document.createElement('style');
             style.id = 'score-fix-style';
             style.textContent = `
-                .score-notes { align-items: baseline !important; row-gap: 45px !important; }
-                .bar-line { align-self: auto !important; margin-bottom: 0 !important; vertical-align: baseline; font-weight: 300; }
-                .note-unit { position: relative; overflow: visible !important; vertical-align: baseline; }
-                .note-content { display: inline-block; line-height: 24px; }
-                .dots-top { position: absolute; bottom: 22px; left: 0; width: 100%; pointer-events: none; }
-                .bottom-wrapper { position: absolute; top: 26px; left: 0; width: 100%; display: flex; flex-direction: column; align-items: center; pointer-events: none; }
-                .rhythm-dot { position: absolute; right: -8px; bottom: 4px; }
+                .score-notes { 
+                    align-items: baseline !important; 
+                    row-gap: 70px !important; 
+                }
+                .bar-line { 
+                    align-self: auto !important; 
+                    margin-bottom: 0 !important; 
+                    vertical-align: baseline; 
+                    font-weight: 300; 
+                }
+                .note-unit { 
+                    position: relative; 
+                    overflow: visible !important; 
+                    vertical-align: baseline;
+                    margin-right: 4px; /* 增加一点横向间距 */
+                }
+                .note-content { 
+                    display: inline-block; 
+                    line-height: 1; /* 收紧行高 */
+                }
+                .dots-top { 
+                    position: absolute; 
+                    bottom: 24px; /* [FIX] 提高位置 */
+                    left: 0; 
+                    width: 100%; 
+                    pointer-events: none; 
+                }
+                .bottom-wrapper { 
+                    position: absolute; 
+                    top: 22px; /* [FIX] 降低位置 */
+                    left: 0; 
+                    width: 100%; 
+                    display: flex; 
+                    flex-direction: column; 
+                    align-items: center; 
+                    pointer-events: none; 
+                }
+                .rhythm-dot { 
+                    position: absolute; 
+                    right: -10px; 
+                    bottom: 2px; 
+                }
             `;
             document.head.appendChild(style);
         }
@@ -27,10 +65,10 @@ export default class ScoreRenderer {
         this.ticksPerMeasure = val;
     }
 
-    render(noteEvents, keySignature, transpose, tempo, bpmMultiplier = 0.5) {
+    render(noteEvents, keySignature, transpose, tempo, bpmMultiplier = 1.0) {
         this.container.innerHTML = '';
         if (noteEvents.length === 0) { 
-            this.container.innerHTML = '<div class="no-notes" style="color:#999;text-align:center;">No notes found</div>'; 
+            this.container.innerHTML = '<div class="no-notes" style="color:var(--text-sub);text-align:center;">No notes found</div>'; 
             return; 
         }
         
@@ -40,7 +78,7 @@ export default class ScoreRenderer {
         keyInfo.innerHTML = `Key: 1=${keySignature}${transInfo} | BPM: <span id="bpm-display"></span> | Notes: ${noteEvents.length}`;
         this.container.appendChild(keyInfo);
         
-        // ?? BPM
+        // 更新 BPM
         this.updateBPMDisplay(tempo, bpmMultiplier);
         
         const scoreDiv = document.createElement('div');
@@ -58,8 +96,7 @@ export default class ScoreRenderer {
                 scoreDiv.appendChild(barLine); 
                 lastMeasureIndex = measureIndex;
             }
-            // ?????????????????????? DOM ???????? column ??????????????
-            // ??????????????
+            
             group.notes.sort((a, b) => (b.note + transpose) - (a.note + transpose));
             
             if (group.notes.length > 1) {
@@ -77,9 +114,15 @@ export default class ScoreRenderer {
     updateBPMDisplay(baseTempo, multiplier) {
         const bpmDisplay = document.getElementById('bpm-display');
         if (bpmDisplay && baseTempo) {
+            // [FIX] 简单的 BPM 计算：60,000,000 / MPQ
+            // 如果显示的数值是实际听感的2倍，通常是因为 TimeSignature 导致的（例如把八分音符当成一拍）
+            // 这里我们保持标准 MIDI 定义：BPM = Quarter Notes Per Minute
             const baseBPM = Math.round(60000000 / baseTempo);
             const currentBPM = Math.round(baseBPM * multiplier);
-            bpmDisplay.textContent = `${currentBPM}`;
+            
+            // 显示当前速度，并显示倍率
+            const percent = Math.round(multiplier * 100);
+            bpmDisplay.textContent = `${currentBPM} (${percent}%)`;
         }
     }
 
@@ -202,17 +245,6 @@ export default class ScoreRenderer {
         }
 
         return container;
-    }
-
-    highlight(currentTime) {
-        const prevHighlights = document.querySelectorAll('.current-note');
-        prevHighlights.forEach(el => { el.classList.remove('current-note'); });
-        
-        // ??????????? scoreNotes ????????
-        // ????????????????? "????????" ??????
-        // ???????? DOM ??????????? ID ???????????????????
-        // ????????? `setActiveNotes` ??? `render` ?????
-        // ??????????????????? noteIndex????? `highlightIndex`.
     }
 
     highlightNotes(scoreNotes, currentTime) {

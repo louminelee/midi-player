@@ -11,9 +11,10 @@ export default class TapTapMode {
         // 创建全屏覆盖层
         this.overlay = document.createElement('div');
         this.overlay.id = 'taptap-overlay';
+        // [修复] 使用 &times; 替代直接的字符，防止乱码
         this.overlay.innerHTML = `
             <div class="taptap-hint">TAP / CLICK / SPACE<br><span>to play the beat</span></div>
-            <button class="taptap-exit">×</button>
+            <button class="taptap-exit">&times;</button>
         `;
         document.body.appendChild(this.overlay);
         
@@ -61,6 +62,9 @@ export default class TapTapMode {
             this.controller.stop();
         }
 
+        // [关键] 必须手动激活视觉引擎
+        this.controller.visualizer.setIsPlaying(true);
+
         // 隐藏主界面，显示 Tap 界面
         document.querySelector('.dashboard').style.opacity = '0';
         document.querySelector('.dashboard').style.pointerEvents = 'none';
@@ -74,6 +78,9 @@ export default class TapTapMode {
         this.isActive = false;
         this.overlay.classList.remove('active');
         
+        // 退出时关闭视觉引擎
+        this.controller.visualizer.setIsPlaying(false);
+        
         // 恢复主界面
         document.querySelector('.dashboard').style.opacity = '1';
         document.querySelector('.dashboard').style.pointerEvents = 'auto';
@@ -83,60 +90,57 @@ export default class TapTapMode {
     handleTap(e) {
         if (!this.isActive) return;
 
-        // 1. 视觉反馈：变色 + 物理球爆炸 + 波纹
+        // 1. 视觉反馈
         this.overlay.style.backgroundColor = this.getRandomPastelColor();
-        this.controller.visualizer.triggerNoteImpact(); // 复用原来的物理球效果
         
-        if (e) {
-            this.createRipple(e.clientX, e.clientY);
+        // [修改开始] -------------
+        if (e && (e.clientX !== undefined || (e.touches && e.touches[0]))) {
+            // 获取坐标 (兼容鼠标和触摸)
+            const x = e.clientX || e.touches[0].clientX;
+            const y = e.clientY || e.touches[0].clientY;
+            
+            // 调用新的区域吸引特效
+            this.controller.visualizer.triggerZoneAttraction(x, y);
+            
+            // 生成波纹
+            this.createRipple(x, y);
         } else {
-            // 如果是空格键触发，在屏幕中心生成波纹
+            // 如果是空格键 (没有坐标 e)，则保持原来的全屏随机效果
+            this.controller.visualizer.triggerNoteImpact();
             this.createRipple(window.innerWidth / 2, window.innerHeight / 2);
         }
+        // [修改结束] -------------
 
-        // 2. 隐藏提示文字
+        // 2. 隐藏提示文字 (以下代码保持不变)
         const hint = this.overlay.querySelector('.taptap-hint');
         if (hint) hint.style.opacity = 0;
 
+        // ... 后续播放逻辑保持不变 ...
         // 3. 计算一拍的时间长度 (秒)
-        // BPM = 60,000,000 / baseTempo (微秒)
-        // SecPerBeat = baseTempo / 1,000,000
-        // 还要除以倍率
         const secondsPerBeat = (this.controller.baseTempo / 1000000) / this.controller.tempoMultiplier;
-
-        // 4. 定义当前拍的时间窗口 [start, end)
+        
+        // ... (原有的播放逻辑代码) ...
         const startTime = this.cursorTime;
         const endTime = this.cursorTime + secondsPerBeat;
 
-        // 5. 找出在这个时间窗口内开始的所有音符
         const notesToPlay = this.controller.scheduledNotes.filter(note => 
             note.startTime >= startTime && note.startTime < endTime
         );
 
-        // 6. 播放音符
         notesToPlay.forEach(note => {
             const frequency = MidiProcessor.midiNoteToFrequency(note.note + this.controller.transpose);
-            // 持续时间也受速度倍率影响
             const duration = note.originalDuration / this.controller.tempoMultiplier;
-            
-            // 为了保留切分音的感觉，计算相对于这一拍起点的微小延迟
-            // 如果想要纯粹的“打击感”齐奏，可以把 relativeDelay 设为 0
             const relativeDelay = (note.startTime - startTime) / this.controller.tempoMultiplier;
-            
             this.controller.audio.playTone(frequency, duration, note.velocity, relativeDelay);
         });
 
-        // 7. 更新游标，推进到下一拍
         this.cursorTime += secondsPerBeat;
 
-        // 8. 循环逻辑
         const lastNote = this.controller.scheduledNotes[this.controller.scheduledNotes.length - 1];
         const totalDuration = lastNote ? (lastNote.startTime + lastNote.originalDuration) : 0;
 
-        // 如果超出了乐曲总长度，重置回开头
         if (this.cursorTime > totalDuration + 0.5) {
             this.cursorTime = 0;
-            // 循环时给个特殊的闪光提示 (白色背景闪一下)
             this.overlay.style.backgroundColor = '#ffffff';
             setTimeout(() => {
                 this.overlay.style.backgroundColor = this.getRandomPastelColor();
@@ -145,9 +149,9 @@ export default class TapTapMode {
     }
 
     getRandomPastelColor() {
-        // Mikutap 风格：高饱和度、高亮度，但加了透明度以便看到背后的物理球
+        // 保持低透明度以便看到背景
         const hue = Math.floor(Math.random() * 360);
-        return `hsla(${hue}, 80%, 75%, 0.85)`;
+        return `hsla(${hue}, 80%, 75%, 0.25)`;
     }
 
     createRipple(x, y) {
@@ -157,7 +161,6 @@ export default class TapTapMode {
         ripple.style.top = `${y}px`;
         this.overlay.appendChild(ripple);
 
-        // 动画结束后移除 DOM
         setTimeout(() => ripple.remove(), 600);
     }
 }

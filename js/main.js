@@ -4,7 +4,8 @@ import MidiProcessor from './midi/MidiProcessor.js';
 import ScoreRenderer from './ui/ScoreRenderer.js';
 import AdsrControl from './ui/AdsrControl.js';
 import HandwritingRecogniser from './ai/Handwriting.js';
-import TapTapMode from './ui/TapTapMode.js'; // [NEW] 引入新模块
+import TapTapMode from './ui/TapTapMode.js'; 
+import LiquidSlider from './ui/LiquidSlider.js'; 
 
 class MIDIPlayerController {
     constructor() {
@@ -25,7 +26,7 @@ class MIDIPlayerController {
             this.loadManualScore(digits, key);
         });
         
-        // [NEW] 初始化 TapTap 模式，传入 this (controller) 以便访问数据
+        // 初始化 TapTap 模式
         this.taptap = new TapTapMode(this);
 
         // 链接视觉反馈
@@ -52,6 +53,9 @@ class MIDIPlayerController {
         this.lookAhead = 0.1;
 
         this.initDOMEvents();
+        
+        // 初始化液态滑块动效 (必须在 DOM 解析后)
+        this.initLiquidSliders();
     }
 
     checkDependencies() {
@@ -61,13 +65,19 @@ class MIDIPlayerController {
         }
     }
 
+    initLiquidSliders() {
+        new LiquidSlider('volume', 'volume');
+        new LiquidSlider('tempo', 'tempo');
+    }
+
     initDOMEvents() {
         document.getElementById('midiFile').addEventListener('change', (e) => this.loadMIDIFile(e));
         document.getElementById('playBtn').addEventListener('click', () => this.play());
         document.getElementById('stopBtn').addEventListener('click', () => this.stop());
         
-        // [NEW] 绑定 TapTap 按钮事件
+        // 绑定 TapTap 按钮事件
         document.getElementById('taptapBtn').addEventListener('click', () => {
+            console.log("TapTap mode requested");
             this.taptap.enter();
         });
 
@@ -94,6 +104,63 @@ class MIDIPlayerController {
             document.getElementById('tempoValue').textContent = e.target.value;
             this.renderer.updateBPMDisplay(this.baseTempo, this.tempoMultiplier);
         });
+
+        // [新增] 悬浮按钮逻辑
+        this.floatingStopBtn = document.getElementById('floatingStopBtn');
+        this.floatingStopBtn.addEventListener('click', () => {
+            this.stopWithEffect(); // 使用带特效的停止
+        });
+
+        // [新增] 滚动监听
+        window.addEventListener('scroll', () => {
+            this.checkFloatingButtonVisibility();
+        }, { passive: true });
+    }
+
+    // [新增] 检查是否显示悬浮按钮
+    checkFloatingButtonVisibility() {
+        if (!this.isPlaying) {
+            this.toggleFloatingBtn(false);
+            return;
+        }
+
+        const mainStopBtn = document.getElementById('stopBtn');
+        const rect = mainStopBtn.getBoundingClientRect();
+
+        // 如果原始 Stop 按钮的底部跑到了视口上方 (top < 0 或接近0)，说明看不到了
+        // 这里给一点余量，比如 -50px
+        const isMainBtnHidden = rect.top < -50; 
+
+        if (isMainBtnHidden) {
+            this.toggleFloatingBtn(true);
+        } else {
+            this.toggleFloatingBtn(false);
+        }
+    }
+
+    toggleFloatingBtn(show) {
+        if (show) {
+            this.floatingStopBtn.classList.add('visible');
+            this.floatingStopBtn.classList.remove('vanishing');
+        } else {
+            // 只有当它当前是显示状态，才可能需要移除显示
+            if (this.floatingStopBtn.classList.contains('visible') && !this.floatingStopBtn.classList.contains('vanishing')) {
+                this.floatingStopBtn.classList.remove('visible');
+            }
+        }
+    }
+
+    // [新增] 停止并播放消失特效
+    stopWithEffect() {
+        this.floatingStopBtn.classList.add('vanishing');
+        // 等待动画稍微进行一点再实际停止逻辑，或者同步进行
+        this.stop();
+        
+        // 动画结束后清理类名 (CSS动画是0.5s)
+        setTimeout(() => {
+            this.floatingStopBtn.classList.remove('visible');
+            this.floatingStopBtn.classList.remove('vanishing');
+        }, 500);
     }
 
     loadMIDIFile(event) {
@@ -226,6 +293,9 @@ class MIDIPlayerController {
         document.getElementById('playBtn').disabled = true;
         document.getElementById('stopBtn').disabled = false;
 
+        // [新增] 检查一次悬浮按钮状态（防止用户先滚动再点击播放）
+        this.checkFloatingButtonVisibility();
+
         this.playbackLoop();
     }
 
@@ -284,6 +354,9 @@ class MIDIPlayerController {
         document.getElementById('status').textContent = 'Stopped';
         document.getElementById('playBtn').disabled = false;
         document.getElementById('stopBtn').disabled = true;
+
+        // [新增] 隐藏悬浮按钮 (如果是由普通 stop 触发，确保悬浮按钮也被隐藏)
+        this.checkFloatingButtonVisibility();
     }
 }
 

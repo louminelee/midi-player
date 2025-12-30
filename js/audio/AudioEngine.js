@@ -8,8 +8,8 @@ export default class AudioEngine {
         this.masterGain.connect(this.audioContext.destination);
         
         this.currentNotes = new Map();
-        // 默认 ADSR
-        this.adsr = { attack: 0.05, decay: 0.2, sustain: 0.6, release: 0.3 };
+        // 默认 ADSR: 增加了 sustainTime (单位:秒)
+        this.adsr = { attack: 0.05, decay: 0.2, sustain: 0.6, sustainTime: 0.5, release: 0.3 };
         
         // 回调：当音符开始时触发（用于视觉效果）
         this.onNoteStart = null;
@@ -48,23 +48,34 @@ export default class AudioEngine {
         const now = this.audioContext.currentTime;
         const noteStart = now + startTimeOffset;
         
-        const { attack, decay, sustain, release } = this.adsr;
+        // 获取所有参数，包括新的 sustainTime
+        const { attack, decay, sustain, sustainTime, release } = this.adsr;
         
         const peakGain = velocity * 0.8;
         const sustainGain = peakGain * sustain;
         
+        // 1. Attack 阶段 (上升到峰值)
         gainNode.gain.setValueAtTime(0, noteStart);
         gainNode.gain.linearRampToValueAtTime(peakGain, noteStart + attack);
+        
+        // 2. Decay 阶段 (下降到 Sustain Level)
         gainNode.gain.setTargetAtTime(sustainGain, noteStart + attack, decay / 3);
 
-        const noteOffTime = Math.max(noteStart + duration, noteStart + attack);
-        gainNode.gain.setTargetAtTime(0, noteOffTime, release / 3);
+        // 3. Sustain / Hold 阶段
+        // 在这里，我们将 Sustain 视为一段固定的时间，而不是一直保持到松开琴键
+        // 这样可以让旋钮完全控制声音的形态。
+        // 计算 Sustain 结束的时间点：
+        const holdEnd = noteStart + attack + decay + sustainTime;
+
+        // 4. Release 阶段 (从 Sustain Level 衰减到 0)
+        gainNode.gain.setTargetAtTime(0, holdEnd, release / 3);
         
         osc.connect(gainNode); 
         gainNode.connect(this.masterGain);
         osc.start(noteStart);
         
-        const stopTime = noteOffTime + (release * 5);
+        // 停止振荡器的时间 (留出足够的 Release 时间防止爆音)
+        const stopTime = holdEnd + (release * 5);
         osc.stop(stopTime);
         
         // 触发视觉回调
