@@ -4,6 +4,7 @@ import MidiProcessor from './midi/MidiProcessor.js';
 import ScoreRenderer from './ui/ScoreRenderer.js';
 import AdsrControl from './ui/AdsrControl.js';
 import HandwritingRecogniser from './ai/Handwriting.js';
+import TapTapMode from './ui/TapTapMode.js'; // [NEW] 引入新模块
 
 class MIDIPlayerController {
     constructor() {
@@ -23,6 +24,9 @@ class MIDIPlayerController {
         this.handwriting = new HandwritingRecogniser((digits, key) => {
             this.loadManualScore(digits, key);
         });
+        
+        // [NEW] 初始化 TapTap 模式，传入 this (controller) 以便访问数据
+        this.taptap = new TapTapMode(this);
 
         // 链接视觉反馈
         this.audio.onNoteStart = () => {
@@ -62,6 +66,11 @@ class MIDIPlayerController {
         document.getElementById('playBtn').addEventListener('click', () => this.play());
         document.getElementById('stopBtn').addEventListener('click', () => this.stop());
         
+        // [NEW] 绑定 TapTap 按钮事件
+        document.getElementById('taptapBtn').addEventListener('click', () => {
+            this.taptap.enter();
+        });
+
         document.getElementById('keySignature').addEventListener('change', (e) => {
             this.keySignature = e.target.value;
             if (this.scheduledNotes.length > 0 || this.midiData) this.refreshScore();

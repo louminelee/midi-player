@@ -27,7 +27,7 @@ export default class ScoreRenderer {
         this.ticksPerMeasure = val;
     }
 
-    render(noteEvents, keySignature, transpose, tempo, bpmMultiplier = 1.0) {
+    render(noteEvents, keySignature, transpose, tempo, bpmMultiplier = 0.5) {
         this.container.innerHTML = '';
         if (noteEvents.length === 0) { 
             this.container.innerHTML = '<div class="no-notes" style="color:#999;text-align:center;">No notes found</div>'; 

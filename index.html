@@ -31,6 +31,8 @@
 
         .dashboard {
             display: flex; gap: 20px; margin-bottom: 20px; flex-wrap: wrap; position: relative; z-index: 10;
+            /* 添加过渡效果以便平滑消失 */
+            transition: opacity 0.3s ease;
         }
 
         .panel {
@@ -92,6 +94,7 @@
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
             line-height: 1.5; font-size: 20px;
             white-space: normal; overflow-x: auto; min-height: 200px;
+            transition: opacity 0.3s ease;
         }
 
         .score-notes { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 8px; row-gap: 25px; }
@@ -158,6 +161,52 @@
             background: rgba(255,255,255,0.8); display: none; align-items: center; justify-content: center;
             font-weight: bold; color: var(--accent-color); border-radius: 24px;
         }
+
+        /* [NEW] TapTap Mode Styles */
+        #taptap-overlay {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            z-index: 1000;
+            background: rgba(255, 255, 255, 0.9);
+            display: none;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            transition: background-color 0.15s ease, opacity 0.3s ease;
+            cursor: pointer;
+            overflow: hidden;
+            /* 允许点击穿透一点点以便看到底层动画 */
+        }
+
+        #taptap-overlay.active { display: flex; }
+
+        .taptap-hint {
+            font-size: 24px; font-weight: 200; color: #333; letter-spacing: 2px;
+            text-align: center; pointer-events: none; transition: opacity 0.5s;
+            user-select: none;
+        }
+        .taptap-hint span { font-size: 14px; color: #666; font-weight: 400; }
+
+        .taptap-exit {
+            position: absolute; top: 20px; right: 20px;
+            width: 40px; height: 40px;
+            font-size: 30px; line-height: 1;
+            border: none; background: transparent; color: #333;
+            cursor: pointer; z-index: 1001;
+        }
+        .taptap-exit:hover { transform: scale(1.1); color: #000; }
+
+        .tap-ripple {
+            position: absolute; width: 20px; height: 20px;
+            background: rgba(255, 255, 255, 0.8);
+            border-radius: 50%;
+            transform: translate(-50%, -50%);
+            animation: rippleAnim 0.6s linear;
+            pointer-events: none;
+        }
+        @keyframes rippleAnim {
+            0% { transform: translate(-50%, -50%) scale(1); opacity: 0.8; }
+            100% { transform: translate(-50%, -50%) scale(20); opacity: 0; }
+        }
     </style>
 </head>
 <body>
@@ -171,6 +220,7 @@
                 <input type="file" id="midiFile" accept=".mid,.midi">
                 <button id="playBtn">Play</button>
                 <button id="stopBtn" disabled>Stop</button>
+                <button id="taptapBtn" style="border-color:#ff2d55; color:#ff2d55;">TapTap Mode</button>
                 <button id="handwriteBtn"> Write Score</button>
             </div>
             
