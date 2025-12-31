@@ -459,6 +459,39 @@
             position: relative;
             z-index: 2;
         }
+        /* [NEW] Neutral Zone Lens Style */
+        #center-lens {
+        position: absolute;
+        top: 50%; left: 50%;
+        transform: translate(-50%, -50%);
+        border-radius: 50%;
+        z-index: 999; /* Below the text, above the background */
+        pointer-events: none; /* Allow clicks to pass through to the handler */
+        display: none; /* Hidden by default */
+        
+        /* Concave Lens Optical Illusion */
+        /* 1. Background: Fades out at edges (Outer ring high transparency) */
+        background: radial-gradient(
+            circle at 40% 40%, 
+            rgba(255, 255, 255, 0.1) 0%, 
+            rgba(255, 255, 255, 0.05) 50%, 
+            rgba(255, 255, 255, 0) 80%
+        );
+
+        /* 2. Shadows: Inset shadows create the "depressed/concave" look */
+        box-shadow: 
+            inset 10px 10px 30px rgba(0, 0, 0, 0.15),   /* Inner Top-Left Shadow */
+            inset -5px -5px 15px rgba(255, 255, 255, 0.4), /* Inner Bottom-Right Highlight */
+            0 0 0 1px rgba(255,255,255,0.05); /* Very faint outer border */
+
+        /* 3. Refraction simulation */
+        backdrop-filter: blur(1px) contrast(1.1);
+        transition: opacity 0.3s ease;
+    }
+
+    #center-lens.active {
+        display: block;
+    }
     </style>
 </head>
 <body>
