@@ -6,10 +6,6 @@ export default class ScoreRenderer {
     }
 
     injectStyles() {
-        // [FIX] 针对液体玻璃风格(大字体)调整定位参数
-        // 增加行间距 row-gap: 65px (原45px)，防止八度点重叠
-        // 调整 dots-top bottom: 32px (原22px)，避开大号数字
-        // 调整 bottom-wrapper top: 34px (原26px)
         if(!document.getElementById('score-fix-style')) {
             const style = document.createElement('style');
             style.id = 'score-fix-style';
@@ -28,22 +24,22 @@ export default class ScoreRenderer {
                     position: relative; 
                     overflow: visible !important; 
                     vertical-align: baseline;
-                    margin-right: 4px; /* 增加一点横向间距 */
+                    margin-right: 4px; 
                 }
                 .note-content { 
                     display: inline-block; 
-                    line-height: 1; /* 收紧行高 */
+                    line-height: 1; 
                 }
                 .dots-top { 
                     position: absolute; 
-                    bottom: 24px; /* [FIX] 提高位置 */
+                    bottom: 24px; 
                     left: 0; 
                     width: 100%; 
                     pointer-events: none; 
                 }
                 .bottom-wrapper { 
                     position: absolute; 
-                    top: 22px; /* [FIX] 降低位置 */
+                    top: 22px; 
                     left: 0; 
                     width: 100%; 
                     display: flex; 
@@ -78,7 +74,6 @@ export default class ScoreRenderer {
         keyInfo.innerHTML = `Key: 1=${keySignature}${transInfo} | BPM: <span id="bpm-display"></span> | Notes: ${noteEvents.length}`;
         this.container.appendChild(keyInfo);
         
-        // 更新 BPM
         this.updateBPMDisplay(tempo, bpmMultiplier);
         
         const scoreDiv = document.createElement('div');
@@ -114,13 +109,8 @@ export default class ScoreRenderer {
     updateBPMDisplay(baseTempo, multiplier) {
         const bpmDisplay = document.getElementById('bpm-display');
         if (bpmDisplay && baseTempo) {
-            // [FIX] 简单的 BPM 计算：60,000,000 / MPQ
-            // 如果显示的数值是实际听感的2倍，通常是因为 TimeSignature 导致的（例如把八分音符当成一拍）
-            // 这里我们保持标准 MIDI 定义：BPM = Quarter Notes Per Minute
             const baseBPM = Math.round(60000000 / baseTempo);
             const currentBPM = Math.round(baseBPM * multiplier);
-            
-            // 显示当前速度，并显示倍率
             const percent = Math.round(multiplier * 100);
             bpmDisplay.textContent = `${currentBPM} (${percent}%)`;
         }
@@ -247,7 +237,8 @@ export default class ScoreRenderer {
         return container;
     }
 
-    highlightNotes(scoreNotes, currentTime) {
+    // [修改] 核心高亮逻辑：增加了 shouldScroll 参数
+    highlightNotes(scoreNotes, currentTime, shouldScroll = false) {
         const prevHighlights = document.querySelectorAll('.current-note');
         prevHighlights.forEach(el => { el.classList.remove('current-note'); });
         
@@ -259,11 +250,14 @@ export default class ScoreRenderer {
                 const el = document.getElementById(`note-${note.index}`);
                 if (el) { 
                     el.classList.add('current-note'); 
+                    // 记录这一帧第一个高亮音符，作为锚点
                     if (!firstActiveElement) firstActiveElement = el; 
                 }
             }
         }
-        if (firstActiveElement) {
+        
+        // 只有当允许滚动 (3秒一次 + 鼠标静止) 时，才执行滚动
+        if (shouldScroll && firstActiveElement) {
             firstActiveElement.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'center' });
         }
     }

@@ -52,6 +52,10 @@ class MIDIPlayerController {
         this.lastFrameTime = 0;
         this.lookAhead = 0.1;
 
+        // [新增] 滚动控制相关的计时器
+        this.lastMouseMoveTime = 0;   
+        this.lastAutoScrollTime = 0;  
+
         this.initDOMEvents();
         
         // 初始化液态滑块动效 (必须在 DOM 解析后)
@@ -105,19 +109,31 @@ class MIDIPlayerController {
             this.renderer.updateBPMDisplay(this.baseTempo, this.tempoMultiplier);
         });
 
-        // [新增] 悬浮按钮逻辑
+        // [新增] 监听振荡器类型切换
+        const oscSelect = document.getElementById('oscillatorType');
+        if (oscSelect) {
+            oscSelect.addEventListener('change', (e) => {
+                this.audio.setOscType(e.target.value);
+            });
+        }
+
+        // [新增] 悬浮停止按钮逻辑
         this.floatingStopBtn = document.getElementById('floatingStopBtn');
         this.floatingStopBtn.addEventListener('click', () => {
-            this.stopWithEffect(); // 使用带特效的停止
+            this.stopWithEffect(); 
         });
 
-        // [新增] 滚动监听
+        // [新增] 页面滚动监听 (控制悬浮按钮显隐)
         window.addEventListener('scroll', () => {
             this.checkFloatingButtonVisibility();
         }, { passive: true });
+
+        // [新增] 全局监听鼠标移动 (用于防抖滚动)
+        window.addEventListener('mousemove', () => {
+            this.lastMouseMoveTime = performance.now();
+        });
     }
 
-    // [新增] 检查是否显示悬浮按钮
     checkFloatingButtonVisibility() {
         if (!this.isPlaying) {
             this.toggleFloatingBtn(false);
@@ -126,9 +142,7 @@ class MIDIPlayerController {
 
         const mainStopBtn = document.getElementById('stopBtn');
         const rect = mainStopBtn.getBoundingClientRect();
-
-        // 如果原始 Stop 按钮的底部跑到了视口上方 (top < 0 或接近0)，说明看不到了
-        // 这里给一点余量，比如 -50px
+        // 如果原始 Stop 按钮看不到了
         const isMainBtnHidden = rect.top < -50; 
 
         if (isMainBtnHidden) {
@@ -143,20 +157,15 @@ class MIDIPlayerController {
             this.floatingStopBtn.classList.add('visible');
             this.floatingStopBtn.classList.remove('vanishing');
         } else {
-            // 只有当它当前是显示状态，才可能需要移除显示
             if (this.floatingStopBtn.classList.contains('visible') && !this.floatingStopBtn.classList.contains('vanishing')) {
                 this.floatingStopBtn.classList.remove('visible');
             }
         }
     }
 
-    // [新增] 停止并播放消失特效
     stopWithEffect() {
         this.floatingStopBtn.classList.add('vanishing');
-        // 等待动画稍微进行一点再实际停止逻辑，或者同步进行
         this.stop();
-        
-        // 动画结束后清理类名 (CSS动画是0.5s)
         setTimeout(() => {
             this.floatingStopBtn.classList.remove('visible');
             this.floatingStopBtn.classList.remove('vanishing');
@@ -217,11 +226,10 @@ class MIDIPlayerController {
         );
     }
 
-    // 处理手写识别结果
     loadManualScore(digits, key) {
         if (this.isPlaying) this.stop();
         
-        this.midiData = null; // 清除 MIDI 数据
+        this.midiData = null; 
         this.keySignature = key;
         document.getElementById('keySignature').value = key;
         
@@ -255,7 +263,7 @@ class MIDIPlayerController {
                     originalDuration: 0.5,
                     velocity: 0.8,
                     pitchInfo: pitchInfo,
-                    octave: pitchInfo.octave // 确保 octave 存在
+                    octave: pitchInfo.octave 
                 });
             }
             currentTime += 0.5;
@@ -269,7 +277,6 @@ class MIDIPlayerController {
         this.renderer.render(noteEvents, key, 0, this.baseTempo, 1.0);
         document.getElementById('status').textContent = `Loaded Handwritten Score: ${noteEvents.length} notes`;
         
-        // Hack to update file input text
         try {
             const dt = new DataTransfer();
             dt.items.add(new File([""], "write score", { type: "text/plain" }));
@@ -293,7 +300,6 @@ class MIDIPlayerController {
         document.getElementById('playBtn').disabled = true;
         document.getElementById('stopBtn').disabled = false;
 
-        // [新增] 检查一次悬浮按钮状态（防止用户先滚动再点击播放）
         this.checkFloatingButtonVisibility();
 
         this.playbackLoop();
@@ -326,10 +332,24 @@ class MIDIPlayerController {
             }
         }
 
-        // 高亮更新
-        this.renderer.highlightNotes(this.scheduledNotes, this.currentScoreTime);
+        // --- [核心逻辑] 计算是否需要滚动 ---
+        
+        // 条件1: 鼠标已经静止超过 1秒
+        const isMouseIdle = (now - this.lastMouseMoveTime) > 1000;
+        // 条件2: 距离上次自动滚动已经超过 3秒
+        const isTimeToScroll = (now - this.lastAutoScrollTime) > 3000;
 
-        // 检查结束
+        let shouldScroll = false;
+        if (isMouseIdle && isTimeToScroll) {
+            shouldScroll = true;
+            this.lastAutoScrollTime = now;
+        }
+
+        // 传递 shouldScroll 给渲染器
+        this.renderer.highlightNotes(this.scheduledNotes, this.currentScoreTime, shouldScroll);
+
+        // --------------------------------
+
         const lastNote = this.scheduledNotes[this.scheduledNotes.length - 1];
         if (lastNote && this.currentScoreTime > lastNote.startTime + lastNote.originalDuration + 1.0) {
              this.stop();
@@ -348,19 +368,16 @@ class MIDIPlayerController {
         
         this.audio.stopAll();
         
-        // 重置高亮
         document.querySelectorAll('.current-note').forEach(el => el.classList.remove('current-note'));
         
         document.getElementById('status').textContent = 'Stopped';
         document.getElementById('playBtn').disabled = false;
         document.getElementById('stopBtn').disabled = true;
 
-        // [新增] 隐藏悬浮按钮 (如果是由普通 stop 触发，确保悬浮按钮也被隐藏)
         this.checkFloatingButtonVisibility();
     }
 }
 
-// 启动
 window.addEventListener('DOMContentLoaded', () => {
     new MIDIPlayerController();
 });
