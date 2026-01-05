@@ -6,11 +6,11 @@
     <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@latest/dist/tf.min.js"></script>
     <style>
         :root {
-            /* --- æ¶²ä½“ç»ç’ƒæ ¸å¿ƒå˜é‡ --- */
+            /* --- ÒºÌå²£Á§ºËĞÄ±äÁ¿ --- */
             --glass-surface: linear-gradient(145deg, rgba(255, 255, 255, 0.6), rgba(255, 255, 255, 0.1));
             --glass-border: rgba(255, 255, 255, 0.4);
             
-            /* ç«‹ä½“æ„Ÿé˜´å½± */
+            /* Á¢Ìå¸ĞÒõÓ° */
             --liquid-shadow: 
                 0 20px 40px rgba(0, 0, 0, 0.1), 
                 0 5px 15px rgba(0, 0, 0, 0.05), 
@@ -48,7 +48,7 @@
             transition: opacity 0.3s ease;
         }
 
-        /* --- é¢æ¿é€šç”¨æ ·å¼ --- */
+        /* --- Ãæ°åÍ¨ÓÃÑùÊ½ --- */
         .panel {
             background: var(--glass-surface);
             backdrop-filter: blur(40px) saturate(150%); 
@@ -58,8 +58,8 @@
             box-shadow: var(--liquid-shadow);
             padding: 32px; 
             transition: transform 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
-            position: relative; /* ç¡®ä¿å†…éƒ¨å®šä½æ­£ç¡® */
-            overflow: hidden;   /* é…åˆå…‰æ•ˆ */
+            position: relative; /* È·±£ÄÚ²¿¶¨Î»ÕıÈ· */
+            overflow: hidden;   /* ÅäºÏ¹âĞ§ */
         }
         
         .panel::after {
@@ -79,7 +79,7 @@
             box-shadow: inset 0 0 15px rgba(255, 255, 255, 0.3);
         }
 
-        /* æå‡äº¤äº’æ§ä»¶å±‚çº§ */
+        /* ÌáÉı½»»¥¿Ø¼ş²ã¼¶ */
         .panel > * { position: relative; z-index: 2; }
         
         .panel:hover {
@@ -107,7 +107,7 @@
 
         .control-group { margin-bottom: 24px; display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
 
-        /* --- æŒ‰é’®æ ·å¼ --- */
+        /* --- °´Å¥ÑùÊ½ --- */
         input[type="file"]::file-selector-button, button {
             background: rgba(255, 255, 255, 0.5);
             color: var(--accent-color);
@@ -142,7 +142,7 @@
 
         #status { font-size: 13px; color: var(--text-sub); font-weight: 500; padding-top: 10px; }
 
-        /* --- æ¶²æ€æ»‘å— (Liquid Slider) --- */
+        /* --- ÒºÌ¬»¬¿é (Liquid Slider) --- */
         .liquid-slider-wrapper {
             position: relative;
             width: 100%;
@@ -195,7 +195,7 @@
         }
         .liquid-slider-wrapper.active .slider-effect-ring { opacity: 1; }
 
-        /* --- æ—‹é’® --- */
+        /* --- ĞıÅ¥ --- */
         .adsr-visualizer { 
             width: 100%; height: 120px; border-radius: 20px; margin-bottom: 24px; 
             background: rgba(255,255,255,0.3);
@@ -230,7 +230,7 @@
         }
         .val-input:focus { background: white; box-shadow: 0 0 0 2px var(--accent-color); outline: none; }
 
-        /* --- ä¹è°±æ˜¾ç¤ºæ’ç‰ˆ --- */
+        /* --- ÀÖÆ×ÏÔÊ¾ÅÅ°æ --- */
         #scoreDisplay {
             position: relative; z-index: 10; 
             background: rgba(255, 255, 255, 0.5);
@@ -267,7 +267,7 @@
         .current-note .extension-dash { color: var(--accent-color); }
         .chord-group { display: inline-flex; flex-direction: column; border: 1px dashed rgba(0,0,0,0.1); border-radius: 4px; padding: 2px; align-items: center; }
 
-        /* --- ä¸‹æ‹‰èœå• --- */
+        /* --- ÏÂÀ­²Ëµ¥ --- */
         select {
             appearance: none; background: rgba(255,255,255,0.6); border: none;
             padding: 8px 30px 8px 12px; border-radius: 12px; 
@@ -280,7 +280,7 @@
             background-repeat: no-repeat; background-position: right 10px center; background-size: 10px;
         }
 
-        /* --- æ¨¡æ€æ¡† --- */
+        /* --- Ä£Ì¬¿ò --- */
         #handwriteModal {
             position: fixed; top: 0; left: 0; width: 100%; height: 100%;
             background: rgba(200, 200, 200, 0.2); z-index: 100;
@@ -361,7 +361,7 @@
             font-weight: bold; color: var(--accent-color); border-radius: 24px;
         }
 
-        /* --- æ‚¬æµ®åœæ­¢æŒ‰é’® --- */
+        /* --- Ğü¸¡Í£Ö¹°´Å¥ --- */
         #floatingStopBtn {
             position: fixed; bottom: 40px; right: 40px; width: 80px; height: 80px;
             border-radius: 50%;
@@ -378,7 +378,7 @@
         @keyframes popVanish { 0% { transform: scale(1); opacity: 1; } 40% { transform: scale(1.2); opacity: 0.8; } 100% { transform: scale(0); opacity: 0; } }
         #floatingStopBtn:hover { transform: scale(1.1); box-shadow: 0 0 30px rgba(255, 59, 48, 0.6); }
 
-        /* [NEW] TapTap ä¸­æ€§å‡¹é€é•œ */
+        /* [NEW] TapTap ÖĞĞÔ°¼Í¸¾µ */
         #center-lens {
             position: absolute;
             top: 50%; left: 50%;
@@ -388,7 +388,7 @@
             pointer-events: none; 
             display: none; 
             
-            /* 1. èƒŒæ™¯ï¼šè¾¹ç¼˜ç™½ï¼Œä¸­é—´é€ */
+            /* 1. ±³¾°£º±ßÔµ°×£¬ÖĞ¼äÍ¸ */
             background: radial-gradient(
                 circle at 40% 40%, 
                 rgba(255, 255, 255, 0.1) 0%, 
@@ -396,13 +396,13 @@
                 rgba(255, 255, 255, 0) 80%
             );
             
-            /* 2. é˜´å½±ï¼šå†…é˜´å½±åˆ¶é€ å‡¹é™·æ„Ÿ */
+            /* 2. ÒõÓ°£ºÄÚÒõÓ°ÖÆÔì°¼Ïİ¸Ğ */
             box-shadow: 
                 inset 10px 10px 30px rgba(0, 0, 0, 0.15),
                 inset -5px -5px 15px rgba(255, 255, 255, 0.4),
                 0 0 0 1px rgba(255,255,255,0.05);
 
-            /* 3. æ»¤é•œï¼šæŠ˜å°„æ¨¡ç³Š */
+            /* 3. ÂË¾µ£ºÕÛÉäÄ£ºı */
             backdrop-filter: blur(1px) contrast(1.1);
             transition: opacity 0.3s ease;
         }
@@ -465,10 +465,10 @@
             <h2>Envelope Control</h2>
             
             <select id="oscillatorType" style="position: absolute; top: 25px; right: 30px; width: auto; padding-right: 35px; font-size: 12px; z-index: 20;">
-                <option value="sine">Sine </option>
-                <option value="square">Square </option>
-                <option value="triangle" selected>Triangle 1 </option>
-                <option value="sawtooth">Triangle 2 </option>
+                <option value="sine">Sine (ÕıÏÒ²¨)</option>
+                <option value="square">Square (·½²¨)</option>
+                <option value="triangle" selected>Triangle 1 (µÈÑü)</option>
+                <option value="sawtooth">Triangle 2 (Ö±½Ç)</option>
             </select>
 
             <canvas id="adsrCanvas" class="adsr-visualizer" width="340" height="120"></canvas>

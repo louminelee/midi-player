@@ -73,7 +73,7 @@ export default class MidiProcessor {
         return { numerator, denominator };
     }
 
-    // 将 Track 事件转换为适合播放和渲染的 NoteEvents 数组
+    // [修改] 核心处理逻辑：支持休止符填充
     static processTrackToEvents(track, tpq, baseTempo, transpose, keySignature) {
         if (!track || !track.event) return [];
         
@@ -84,6 +84,7 @@ export default class MidiProcessor {
         let currentTime = 0; 
         let noteCount = 0;
         
+        // 1. 提取所有有效音符
         for (const event of track.event) {
             const deltaTicks = event.deltaTime || 0;
             currentTick += deltaTicks; 
@@ -134,7 +135,44 @@ export default class MidiProcessor {
                 }
             }
         }
+
+        // 2. 排序音符
         noteEvents.sort((a, b) => a.startTime - b.startTime);
-        return noteEvents;
+
+        // 3. [新增] 填充休止符 (0)
+        const eventsWithRests = [];
+        let lastVoiceEndTime = 0; 
+        const secondsPerBeat = secondsPerTick * tpq; 
+        const minRestGap = secondsPerBeat / 8; 
+
+        noteEvents.forEach(note => {
+            // 如果当前音符开始时间明显晚于上一个音符的结束时间 -> 插入休止符
+            if (note.startTime > lastVoiceEndTime + minRestGap) {
+                const restDuration = note.startTime - lastVoiceEndTime;
+                const restBeats = restDuration / secondsPerBeat;
+                
+                eventsWithRests.push({
+                    index: noteCount++, 
+                    note: -1,           // 特殊标识：休止符
+                    displayNumber: '0', // 简谱显示为 0
+                    octave: 4,          // 默认中音，不显示上下点
+                    beats: restBeats,
+                    startTick: 0,       
+                    startTime: lastVoiceEndTime,
+                    duration: restDuration,
+                    originalDuration: restDuration,
+                    velocity: 0,
+                    pitchInfo: { name: 'Rest', octave: 4 }
+                });
+            }
+
+            eventsWithRests.push(note);
+            
+            if (note.startTime + note.duration > lastVoiceEndTime) {
+                lastVoiceEndTime = note.startTime + note.duration;
+            }
+        });
+
+        return eventsWithRests;
     }
 }
